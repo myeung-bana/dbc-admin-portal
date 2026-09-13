@@ -20,8 +20,7 @@ export function isSuperAdminRoute(pathname: string) {
 export function isSpaceRoute(pathname: string) {
   return (
     pathname === '/dashboard' ||
-    pathname.startsWith('/sessions') ||
-    pathname.startsWith('/members') ||
-    pathname === '/settings'
+    pathname.startsWith('/dashboard/') ||
+    pathname.startsWith('/members')
   )
 }

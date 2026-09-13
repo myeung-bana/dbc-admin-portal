@@ -14,18 +14,29 @@ function unwrapActionResult<T>(
 }
 import { createSpace, archiveSpace, updateSpace } from '@/lib/data/spaces'
 import { inviteMember, promoteMember } from '@/lib/data/memberships'
-import { createSession, updateSession } from '@/lib/data/sessions'
+import { bulkCreateSessions, createSession, listSessions, updateSession } from '@/lib/data/sessions'
 import {
   createCountry,
   createCourt,
   createLocation,
+  getCourt,
+  listCourts,
+  listLocations,
   updateCountry,
   updateCourt,
   updateLocation,
 } from '@/lib/data/master-data'
+import type { SessionInput } from '@/lib/schemas/session.schema'
 import { createSpaceSchema, updateSpaceSchema } from '@/lib/schemas/space.schema'
 import { inviteMemberSchema } from '@/lib/schemas/membership.schema'
 import { sessionSchema } from '@/lib/schemas/session.schema'
+import { bulkImportPayloadSchema } from '@/lib/schemas/bulk-session.schema'
+import {
+  resolveBulkSessionRows,
+  toBulkSessionInserts,
+  type ResolvedBulkSessionRow,
+} from '@/lib/sessions/bulk-import'
+
 import {
   countrySchema,
   courtSchema,
@@ -104,10 +115,32 @@ export async function promoteMemberAction(spaceId: string, userId: string) {
   revalidatePath(`/members/${userId}`)
 }
 
+async function resolveSessionInput(input: SessionInput): Promise<SessionInput> {
+  if (!input.courtId) {
+    return input
+  }
+
+  const courtResult = await getCourt(input.courtId)
+  if (!courtResult.ok || !courtResult.data.master_courts_by_pk) {
+    throw new Error('Selected court was not found')
+  }
+
+  const courtLocationId = courtResult.data.master_courts_by_pk.location?.id
+  if (input.locationId && courtLocationId && input.locationId !== courtLocationId) {
+    throw new Error('Court does not belong to the selected location')
+  }
+
+  return {
+    ...input,
+    locationId: input.locationId || courtLocationId || '',
+  }
+}
+
 export async function createSessionAction(spaceId: string, formData: FormData) {
   const parsed = sessionSchema.safeParse({
     title: formData.get('title'),
     startsAt: formData.get('startsAt'),
+    endsAt: formData.get('endsAt'),
     capacity: formData.get('capacity') || 15,
     courtId: formData.get('courtId') || '',
     locationId: formData.get('locationId') || '',
@@ -118,16 +151,18 @@ export async function createSessionAction(spaceId: string, formData: FormData) {
     throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
   }
 
-  const result = unwrapActionResult(await createSession(spaceId, parsed.data))
+  const input = await resolveSessionInput(parsed.data)
+  const result = unwrapActionResult(await createSession(spaceId, input))
 
-  revalidatePath('/sessions')
-  redirect(`/sessions/${result.insert_sessions_one.id}`)
+  revalidatePath('/dashboard/sessions')
+  redirect(`/dashboard/sessions/${result.insert_sessions_one.id}`)
 }
 
 export async function updateSessionAction(sessionId: string, formData: FormData) {
   const parsed = sessionSchema.safeParse({
     title: formData.get('title'),
     startsAt: formData.get('startsAt'),
+    endsAt: formData.get('endsAt'),
     capacity: formData.get('capacity') || 15,
     courtId: formData.get('courtId') || '',
     locationId: formData.get('locationId') || '',
@@ -138,11 +173,12 @@ export async function updateSessionAction(sessionId: string, formData: FormData)
     throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
   }
 
-  unwrapActionResult(await updateSession(sessionId, parsed.data))
+  const input = await resolveSessionInput(parsed.data)
+  unwrapActionResult(await updateSession(sessionId, input))
 
-  revalidatePath('/sessions')
-  revalidatePath(`/sessions/${sessionId}`)
-  redirect(`/sessions/${sessionId}`)
+  revalidatePath('/dashboard/sessions')
+  revalidatePath(`/dashboard/sessions/${sessionId}`)
+  redirect(`/dashboard/sessions/${sessionId}`)
 }
 
 export async function createCountryAction(formData: FormData) {
@@ -235,3 +271,66 @@ export async function updateCourtAction(courtId: string, formData: FormData) {
   revalidatePath(`/master-console/master-data/courts/${courtId}`)
   revalidatePath(`/master-console/master-data/locations/${parsed.data.locationId}`)
 }
+
+export type BulkImportPreviewResult =
+  | { ok: true; rows: ResolvedBulkSessionRow[]; preview: true }
+  | { ok: true; count: number; preview: false }
+  | { ok: false; error: string }
+
+export async function bulkImportSessionsAction(
+  spaceId: string,
+  payloadJson: string,
+  preview: boolean,
+): Promise<BulkImportPreviewResult> {
+  let parsedJson: unknown
+  try {
+    parsedJson = JSON.parse(payloadJson)
+  } catch {
+    return { ok: false, error: 'Invalid import payload' }
+  }
+
+  const parsed = bulkImportPayloadSchema.safeParse(parsedJson)
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Invalid import data' }
+  }
+
+  const [locationsResult, courtsResult, sessionsResult] = await Promise.all([
+    listLocations(),
+    listCourts(),
+    listSessions(spaceId),
+  ])
+
+  if (!locationsResult.ok) return { ok: false, error: locationsResult.error }
+  if (!courtsResult.ok) return { ok: false, error: courtsResult.error }
+  if (!sessionsResult.ok) return { ok: false, error: sessionsResult.error }
+
+  const resolved = resolveBulkSessionRows(
+    parsed.data,
+    locationsResult.data.master_locations,
+    courtsResult.data.master_courts,
+    sessionsResult.data.sessions,
+  )
+
+  if (preview) {
+    return { ok: true, rows: resolved, preview: true }
+  }
+
+  const validRows = resolved.filter((row) => row.rowErrors.length === 0)
+  if (validRows.length === 0) {
+    return { ok: false, error: 'No valid sessions to import' }
+  }
+
+  const objects = toBulkSessionInserts(spaceId, validRows)
+  const result = await bulkCreateSessions(objects)
+  if (!result.ok) {
+    return { ok: false, error: result.error }
+  }
+
+  revalidatePath('/dashboard/sessions')
+  return {
+    ok: true,
+    count: result.data.insert_sessions.affected_rows,
+    preview: false,
+  }
+}
+

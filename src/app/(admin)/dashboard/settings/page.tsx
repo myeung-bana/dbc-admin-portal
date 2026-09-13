@@ -7,12 +7,13 @@ export default async function SettingsPage() {
   const activeSpace = context.spaces.find((space) => space.id === context.activeSpaceId)
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="w-full space-y-6">
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Settings</h2>
         <p className="text-muted-foreground">Profile and active space context.</p>
       </div>
-      <Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>Signed in as</CardTitle>
         </CardHeader>
@@ -26,7 +27,7 @@ export default async function SettingsPage() {
           </div>
         </CardContent>
       </Card>
-      <Card>
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>Active space</CardTitle>
         </CardHeader>
@@ -35,6 +36,7 @@ export default async function SettingsPage() {
           <p className="text-sm text-muted-foreground">{activeSpace?.slug}</p>
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

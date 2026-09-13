@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useRouter } from "next/navigation"
 import { EllipsisVerticalIcon, LogOutIcon } from "lucide-react"
-import { getBrowserNhost, syncSessionCookie } from "@/lib/nhost/client"
+import { logoutClientSession } from "@/lib/nhost/client"
 
 export function NavUser({
   user,
@@ -37,13 +37,7 @@ export function NavUser({
   const router = useRouter()
 
   async function handleLogout() {
-    const nhost = getBrowserNhost()
-    const session = nhost.getUserSession()
-    if (session?.refreshToken) {
-      await nhost.auth.signOut({ refreshToken: session.refreshToken })
-    }
-    nhost.sessionStorage.remove()
-    await syncSessionCookie(null)
+    await logoutClientSession()
     router.push('/login')
     router.refresh()
   }

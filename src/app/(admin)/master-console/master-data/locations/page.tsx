@@ -11,14 +11,25 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { getAdminContext } from '@/lib/admin-context'
-import { listLocations } from '@/lib/data/master-data'
+import { listCourts, listLocations } from '@/lib/data/master-data'
 
 export default async function LocationsPage() {
   const context = await getAdminContext()
   if (!context.isSuperAdmin) redirect('/dashboard')
 
-  const result = await listLocations()
-  const locations = result.ok ? result.data.master_locations : []
+  const [locationsResult, courtsResult] = await Promise.all([
+    listLocations(),
+    listCourts(),
+  ])
+  const locations = locationsResult.ok ? locationsResult.data.master_locations : []
+  const courts = courtsResult.ok ? courtsResult.data.master_courts : []
+  const courtCountByLocation = courts.reduce<Map<string, number>>((counts, court) => {
+    const locationId = court.location?.id
+    if (locationId) {
+      counts.set(locationId, (counts.get(locationId) ?? 0) + 1)
+    }
+    return counts
+  }, new Map())
 
   return (
     <div className="space-y-6">
@@ -59,7 +70,7 @@ export default async function LocationsPage() {
                     <TableCell className="font-medium">{location.name}</TableCell>
                     <TableCell>{location.country?.name ?? '—'}</TableCell>
                     <TableCell>{location.address ?? '—'}</TableCell>
-                    <TableCell>{location.courts_aggregate.aggregate?.count ?? 0}</TableCell>
+                    <TableCell>{courtCountByLocation.get(location.id) ?? 0}</TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="outline"

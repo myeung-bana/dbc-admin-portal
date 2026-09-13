@@ -25,9 +25,10 @@ export type Session = {
   space_id: string
   title: string
   starts_at: string
+  ends_at: string
   capacity: number
   status: 'scheduled' | 'cancelled'
-  court?: { id: string; name: string } | null
+  court?: { id: string; name: string; location?: { id: string; name: string } | null } | null
   location?: { id: string; name: string } | null
 }
 

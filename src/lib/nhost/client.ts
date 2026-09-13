@@ -29,3 +29,19 @@ export async function syncSessionCookie(session: StoredSession | null) {
     body: session ? JSON.stringify(session) : undefined,
   })
 }
+
+export async function logoutClientSession() {
+  const nhost = getBrowserNhost()
+  const session = nhost.getUserSession()
+
+  if (session?.refreshToken) {
+    try {
+      await nhost.auth.signOut({ refreshToken: session.refreshToken })
+    } catch {
+      // Remote sign-out can fail when the session is already expired; still clear locally.
+    }
+  }
+
+  nhost.sessionStorage.remove()
+  await syncSessionCookie(null)
+}

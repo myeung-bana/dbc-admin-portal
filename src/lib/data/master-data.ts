@@ -12,10 +12,6 @@ type CountryListItem = MasterCountry & {
   locations_aggregate: { aggregate: { count: number } | null }
 }
 
-type LocationListItem = MasterLocation & {
-  courts_aggregate: { aggregate: { count: number } | null }
-}
-
 export async function listCountries() {
   return adminGqlRequest<{ master_countries: CountryListItem[] }>(
     `
@@ -70,7 +66,7 @@ export async function listLocationsByCountry(countryId: string) {
 }
 
 export async function listLocations() {
-  return adminGqlRequest<{ master_locations: LocationListItem[] }>(
+  return adminGqlRequest<{ master_locations: MasterLocation[] }>(
     `
       query ListLocations {
         master_locations(order_by: { name: asc }) {
@@ -78,11 +74,6 @@ export async function listLocations() {
           name
           address
           country { id name code }
-          courts_aggregate {
-            aggregate {
-              count
-            }
-          }
         }
       }
     `,

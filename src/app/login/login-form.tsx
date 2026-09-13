@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getBrowserNhost, syncSessionCookie } from '@/lib/nhost/client'
+import { getBrowserNhost, logoutClientSession, syncSessionCookie } from '@/lib/nhost/client'
 import { getPostLoginPath, getUserRolesFromSession, hasAdminPortalAccess } from '@/lib/nhost/roles'
 
 export function LoginForm({ initialError }: { initialError?: string | null }) {
@@ -50,11 +50,7 @@ export function LoginForm({ initialError }: { initialError?: string | null }) {
       const roles = getUserRolesFromSession(session)
 
       if (!hasAdminPortalAccess(roles)) {
-        if (session.refreshToken) {
-          await nhost.auth.signOut({ refreshToken: session.refreshToken })
-        }
-        nhost.sessionStorage.remove()
-        await syncSessionCookie(null)
+        await logoutClientSession()
         setError('This account does not have Super Admin or Organiser access.')
         return
       }

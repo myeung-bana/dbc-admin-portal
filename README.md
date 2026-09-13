@@ -38,6 +38,6 @@ Open http://localhost:3000 and sign in with the seeded Super Admin:
 ## Routes
 
 - `/login`
-- `/dashboard`
-- `/sessions`, `/members`, `/settings`
+- `/dashboard`, `/dashboard/sessions`, `/dashboard/sessions/import`, `/dashboard/settings`
+- `/members`
 - `/master-console/spaces`, `/master-console/master-data/{countries,locations,courts}` with list, create, and detail routes (Master Console only)

@@ -61,10 +61,19 @@ export function AdminShell({
   const showSpaceNav = !isSuperAdmin || viewMode === 'space'
   const homeHref = viewMode === 'super-admin' ? '/master-console/spaces' : '/dashboard'
 
-  const navItem = (href: string, label: string, icon: React.ReactNode) => (
+  const navItem = (
+    href: string,
+    label: string,
+    icon: React.ReactNode,
+    exact = false,
+  ) => (
     <SidebarMenuItem key={href}>
       <SidebarMenuButton
-        isActive={pathname === href || pathname.startsWith(`${href}/`)}
+        isActive={
+          exact
+            ? pathname === href
+            : pathname === href || pathname.startsWith(`${href}/`)
+        }
         render={<Link href={href} />}
       >
         {icon}
@@ -115,10 +124,10 @@ export function AdminShell({
               <SidebarGroupLabel>Space</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {navItem('/dashboard', 'Dashboard', <LayoutDashboardIcon />)}
-                  {navItem('/sessions', 'Sessions', <CalendarDaysIcon />)}
+                  {navItem('/dashboard', 'Dashboard', <LayoutDashboardIcon />, true)}
+                  {navItem('/dashboard/sessions', 'Sessions', <CalendarDaysIcon />)}
                   {navItem('/members', 'Members', <UsersIcon />)}
-                  {navItem('/settings', 'Settings', <Settings2Icon />)}
+                  {navItem('/dashboard/settings', 'Settings', <Settings2Icon />)}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

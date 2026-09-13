@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { requireActiveSpace } from '@/lib/admin-context'
 import { listSessions } from '@/lib/data/sessions'
 import { listSpaceMemberships } from '@/lib/data/spaces'
+import { formatSessionTimeRange, formatSessionVenue } from '@/lib/sessions/format'
 
 export default async function DashboardPage() {
   const context = await requireActiveSpace()
@@ -44,7 +45,7 @@ export default async function DashboardPage() {
             <CardTitle>Quick actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
-            <Button render={<Link href="/sessions/new" />}>Create session</Button>
+            <Button render={<Link href="/dashboard/sessions/create" />}>Create session</Button>
             <Button variant="outline" render={<Link href="/members/invite" />}>
               Invite member
             </Button>
@@ -67,10 +68,10 @@ export default async function DashboardPage() {
                 <div>
                   <p className="font-medium">{session.title}</p>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(session.starts_at).toLocaleString()}
+                    {formatSessionTimeRange(session)} · {formatSessionVenue(session)}
                   </p>
                 </div>
-                <Button variant="outline" size="sm" render={<Link href={`/sessions/${session.id}`} />}>
+                <Button variant="outline" size="sm" render={<Link href={`/dashboard/sessions/${session.id}`} />}>
                   View
                 </Button>
               </div>
