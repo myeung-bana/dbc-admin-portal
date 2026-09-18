@@ -1,41 +1,49 @@
+import {
+  AccountSettingsCard,
+} from '@/components/settings/settings-cards'
+import { SpaceSettingsCard } from '@/components/settings/space-settings-form'
 import { requireActiveSpace } from '@/lib/admin-context'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { listSessions } from '@/lib/data/sessions'
+import { getSpace, listSpaceMemberships } from '@/lib/data/spaces'
+import { redirect } from 'next/navigation'
 
 export default async function SettingsPage() {
   const context = await requireActiveSpace()
-  const activeSpace = context.spaces.find((space) => space.id === context.activeSpaceId)
+
+  const [spaceResult, membersResult, sessionsResult] = await Promise.all([
+    getSpace(context.activeSpaceId),
+    listSpaceMemberships(context.activeSpaceId),
+    listSessions(context.activeSpaceId),
+  ])
+
+  const space = spaceResult.ok ? spaceResult.data.spaces_by_pk : null
+  if (!space) redirect('/dashboard')
+
+  const memberCount = membersResult.ok ? membersResult.data.space_memberships.length : 0
+  const upcomingSessionCount = sessionsResult.ok
+    ? sessionsResult.data.sessions.filter((session) => session.status === 'scheduled').length
+    : 0
 
   return (
     <div className="w-full space-y-6">
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Settings</h2>
-        <p className="text-muted-foreground">Profile and active space context.</p>
+        <p className="text-muted-foreground">Manage your active space and account.</p>
       </div>
+
       <div className="grid gap-6 lg:grid-cols-2">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Signed in as</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="font-medium">{context.user.name}</p>
-          <p className="text-sm text-muted-foreground">{context.user.email}</p>
-          <div className="flex flex-wrap gap-2 pt-2">
-            {context.roles.map((role) => (
-              <Badge key={role}>{role}</Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Active space</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="font-medium">{activeSpace?.name ?? 'No space selected'}</p>
-          <p className="text-sm text-muted-foreground">{activeSpace?.slug}</p>
-        </CardContent>
-      </Card>
+        <SpaceSettingsCard
+          space={space}
+          spaceId={context.activeSpaceId}
+          memberCount={memberCount}
+          upcomingSessionCount={upcomingSessionCount}
+        />
+
+        <AccountSettingsCard
+          name={context.user.name}
+          email={context.user.email}
+          roles={context.roles}
+        />
       </div>
     </div>
   )

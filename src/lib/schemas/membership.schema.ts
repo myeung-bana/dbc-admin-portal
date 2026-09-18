@@ -1,10 +1,15 @@
 import { z } from 'zod'
 
-export const inviteMemberSchema = z.object({
-  email: z.email('Valid email is required'),
-  displayName: z.string().optional(),
-  role: z.enum(['member', 'casual', 'organiser']).default('member'),
-  password: z.string().min(9, 'Password must be at least 9 characters').optional(),
+export const inviteExistingMemberSchema = z.object({
+  userId: z.uuid('Select a user'),
+  role: z.enum(['member', 'casual']).default('member'),
 })
 
-export type InviteMemberInput = z.infer<typeof inviteMemberSchema>
+export const createSpaceInviteSchema = z.object({
+  role: z.enum(['member', 'casual']).default('member'),
+  label: z.string().trim().optional(),
+  email: z.union([z.literal(''), z.email('Valid email is required')]).optional(),
+})
+
+export type InviteExistingMemberInput = z.infer<typeof inviteExistingMemberSchema>
+export type CreateSpaceInviteInput = z.infer<typeof createSpaceInviteSchema>

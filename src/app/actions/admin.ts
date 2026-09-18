@@ -12,8 +12,14 @@ function unwrapActionResult<T>(
 
   return result.data
 }
-import { createSpace, archiveSpace, updateSpace } from '@/lib/data/spaces'
-import { inviteMember, promoteMember } from '@/lib/data/memberships'
+import { createSpace, archiveSpace, updateSpace, updateSpaceLogo, updateSpaceSettings } from '@/lib/data/spaces'
+import {
+  createSpaceInvite,
+  inviteExistingMember,
+  promoteMember,
+  revokeSpaceInvite,
+  searchUsers,
+} from '@/lib/data/memberships'
 import { bulkCreateSessions, createSession, listSessions, updateSession } from '@/lib/data/sessions'
 import {
   createCountry,
@@ -27,8 +33,11 @@ import {
   updateLocation,
 } from '@/lib/data/master-data'
 import type { SessionInput } from '@/lib/schemas/session.schema'
-import { createSpaceSchema, updateSpaceSchema } from '@/lib/schemas/space.schema'
-import { inviteMemberSchema } from '@/lib/schemas/membership.schema'
+import { createSpaceSchema, updateSpaceSchema, updateSpaceSettingsSchema } from '@/lib/schemas/space.schema'
+import {
+  createSpaceInviteSchema,
+  inviteExistingMemberSchema,
+} from '@/lib/schemas/membership.schema'
 import { sessionSchema } from '@/lib/schemas/session.schema'
 import { bulkImportPayloadSchema } from '@/lib/schemas/bulk-session.schema'
 import {
@@ -45,6 +54,14 @@ import {
   updateCourtSchema,
   updateLocationSchema,
 } from '@/lib/schemas/master-data.schema'
+import { getAdminContext, requireActiveSpace } from '@/lib/admin-context'
+import { requireServerSession } from '@/lib/nhost/server'
+import { getUserRolesFromSession, isOrganiserRole, isSuperAdmin } from '@/lib/nhost/roles'
+import { uploadSpaceLogoFile } from '@/lib/nhost/upload-space-logo'
+import {
+  SPACE_LOGO_ACCEPT,
+  SPACE_LOGO_MAX_BYTES,
+} from '@/lib/spaces/logo-constants'
 
 export async function createSpaceAction(formData: FormData) {
   const parsed = createSpaceSchema.safeParse({
@@ -72,6 +89,7 @@ export async function updateSpaceAction(spaceId: string, formData: FormData) {
     slug: formData.get('slug'),
     description: formData.get('description') || undefined,
     status: formData.get('status'),
+    visibility: formData.get('visibility') || 'public',
   })
 
   if (!parsed.success) {
@@ -82,6 +100,133 @@ export async function updateSpaceAction(spaceId: string, formData: FormData) {
 
   revalidatePath('/master-console/spaces')
   revalidatePath(`/master-console/spaces/${spaceId}`)
+  revalidatePath('/dashboard/settings')
+}
+
+function validateLogoFile(file: File | null) {
+  if (!file || file.size === 0) {
+    return { ok: false as const, error: 'Choose a logo image to upload' }
+  }
+
+  if (file.size > SPACE_LOGO_MAX_BYTES) {
+    return { ok: false as const, error: 'Logo must be 5 MB or smaller' }
+  }
+
+  const allowedTypes = SPACE_LOGO_ACCEPT.split(',')
+  if (!allowedTypes.includes(file.type)) {
+    return { ok: false as const, error: 'Logo must be JPG, PNG, or WebP' }
+  }
+
+  return { ok: true as const, file }
+}
+
+export async function updateActiveSpaceSettingsAction(spaceId: string, formData: FormData) {
+  const context = await requireActiveSpace()
+  if (context.activeSpaceId !== spaceId) {
+    throw new Error('You can only edit the active space')
+  }
+
+  const parsed = updateSpaceSettingsSchema.safeParse({
+    name: formData.get('name'),
+    slug: formData.get('slug'),
+    description: formData.get('description') || undefined,
+    visibility: formData.get('visibility') || 'public',
+  })
+
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+  }
+
+  const result = await updateSpaceSettings(spaceId, parsed.data)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  revalidatePath('/dashboard/settings')
+  revalidatePath('/dashboard')
+  revalidatePath('/members')
+}
+
+async function assertCanManageSpace(spaceId: string) {
+  const auth = await requireServerSession()
+  if (!auth.ok) {
+    return {
+      ok: false as const,
+      error:
+        auth.reason === 'expired'
+          ? 'Your session has expired. Please sign in again.'
+          : 'Unauthorized',
+    }
+  }
+
+  const roles = getUserRolesFromSession(auth.session)
+  if (isSuperAdmin(roles)) {
+    return { ok: true as const, auth }
+  }
+
+  if (isOrganiserRole(roles)) {
+    const context = await getAdminContext()
+    if (context.activeSpaceId === spaceId) {
+      return { ok: true as const, auth }
+    }
+  }
+
+  return { ok: false as const, error: 'You can only edit spaces you manage' }
+}
+
+export async function uploadSpaceLogoAction(spaceId: string, formData: FormData) {
+  const access = await assertCanManageSpace(spaceId)
+  if (!access.ok) {
+    return access
+  }
+
+  const fileInput = formData.get('logo')
+  const validated = validateLogoFile(fileInput instanceof File ? fileInput : null)
+  if (!validated.ok) {
+    return validated
+  }
+
+  const uploadResult = await uploadSpaceLogoFile(validated.file, access.auth.nhost)
+  if (!uploadResult.ok) {
+    return uploadResult
+  }
+
+  const updateResult = await updateSpaceLogo(spaceId, uploadResult.logoUrl)
+  if (!updateResult.ok) {
+    return { ok: false as const, error: updateResult.error }
+  }
+
+  revalidatePath('/dashboard/settings')
+  revalidatePath('/dashboard')
+  revalidatePath('/master-console/spaces')
+  revalidatePath(`/master-console/spaces/${spaceId}`)
+
+  return {
+    ok: true as const,
+    data: {
+      logoUrl: uploadResult.logoUrl,
+      space: updateResult.data.update_spaces_by_pk,
+    },
+  }
+}
+
+export async function removeSpaceLogoAction(spaceId: string) {
+  const access = await assertCanManageSpace(spaceId)
+  if (!access.ok) {
+    return access
+  }
+
+  const result = await updateSpaceLogo(spaceId, null)
+  if (!result.ok) {
+    return { ok: false as const, error: result.error }
+  }
+
+  revalidatePath('/dashboard/settings')
+  revalidatePath('/dashboard')
+  revalidatePath('/master-console/spaces')
+  revalidatePath(`/master-console/spaces/${spaceId}`)
+
+  return { ok: true as const, data: { space: result.data.update_spaces_by_pk } }
 }
 
 export async function archiveSpaceAction(spaceId: string) {
@@ -91,22 +236,57 @@ export async function archiveSpaceAction(spaceId: string) {
   return result
 }
 
-export async function inviteMemberAction(spaceId: string, formData: FormData) {
-  const parsed = inviteMemberSchema.safeParse({
-    email: formData.get('email'),
-    displayName: formData.get('displayName') || undefined,
+export async function searchUsersAction(spaceId: string, query: string) {
+  return searchUsers(spaceId, query)
+}
+
+export async function inviteExistingMemberAction(spaceId: string, formData: FormData) {
+  const parsed = inviteExistingMemberSchema.safeParse({
+    userId: formData.get('userId'),
     role: formData.get('role') || 'member',
-    password: formData.get('password') || undefined,
   })
 
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
   }
 
-  unwrapActionResult(await inviteMember(spaceId, parsed.data))
+  const result = await inviteExistingMember(spaceId, parsed.data)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
 
   revalidatePath('/members')
   redirect('/members')
+}
+
+export async function createSpaceInviteAction(spaceId: string, formData: FormData) {
+  const parsed = createSpaceInviteSchema.safeParse({
+    role: formData.get('role') || 'member',
+    label: formData.get('label') || undefined,
+    email: formData.get('email') || undefined,
+  })
+
+  if (!parsed.success) {
+    return { ok: false as const, error: parsed.error.issues[0]?.message ?? 'Invalid input' }
+  }
+
+  const result = await createSpaceInvite(spaceId, parsed.data)
+  if (!result.ok) {
+    return { ok: false as const, error: result.error }
+  }
+
+  revalidatePath('/members')
+  return { ok: true as const, data: result.data.invite }
+}
+
+export async function revokeSpaceInviteAction(inviteId: string) {
+  const result = await revokeSpaceInvite(inviteId)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  revalidatePath('/members')
+  return result
 }
 
 export async function promoteMemberAction(spaceId: string, userId: string) {

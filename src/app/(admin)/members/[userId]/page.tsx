@@ -1,9 +1,13 @@
+import Link from 'next/link'
+import { ChevronLeftIcon } from 'lucide-react'
 import { promoteMemberAction } from '@/app/actions/admin'
-import { requireActiveSpace } from '@/lib/admin-context'
-import { listSpaceMemberships } from '@/lib/data/spaces'
-import { Badge } from '@/components/ui/badge'
+import { MemberAccountCard, MemberMembershipCard } from '@/components/members/member-detail-cards'
+import { MemberActionsCard } from '@/components/members/member-actions-card'
+import { MemberActivityCard } from '@/components/members/member-activity-card'
+import { MemberProfileHeader } from '@/components/members/member-profile-header'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { requireActiveSpace } from '@/lib/admin-context'
+import { getSpaceMembershipDetail } from '@/lib/data/spaces'
 import { redirect } from 'next/navigation'
 
 export default async function MemberDetailPage({
@@ -13,43 +17,45 @@ export default async function MemberDetailPage({
 }) {
   const { userId } = await params
   const context = await requireActiveSpace()
-  const result = await listSpaceMemberships(context.activeSpaceId)
-  const membership = result.ok
-    ? result.data.space_memberships.find((item) => item.user_id === userId)
-    : null
+  const result = await getSpaceMembershipDetail(context.activeSpaceId, userId)
+  const membership = result.ok ? result.data.space_memberships[0] ?? null : null
 
   if (!membership) redirect('/members')
 
+  const displayName =
+    membership.user?.displayName?.trim() ||
+    membership.user?.email ||
+    'Unknown member'
   const promoteMember = promoteMemberAction.bind(null, context.activeSpaceId, userId)
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">
-          {membership.user?.displayName ?? membership.user?.email}
-        </h2>
-        <p className="text-muted-foreground">{membership.user?.email}</p>
+    <div className="w-full space-y-6">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="-ml-2.5"
+        render={<Link href="/members" />}
+      >
+        <ChevronLeftIcon />
+        Back to members
+      </Button>
+
+      <MemberProfileHeader
+        displayName={displayName}
+        email={membership.user?.email}
+        avatarUrl={membership.user?.avatarUrl}
+        role={membership.role}
+        status={membership.status}
+      />
+
+      <div className="grid gap-6 sm:grid-cols-2">
+        <MemberAccountCard user={membership.user} />
+        <MemberMembershipCard membership={membership} />
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Membership</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Badge>{membership.role}</Badge>
-            <Badge variant="secondary">{membership.status}</Badge>
-          </div>
-          {membership.role === 'member' ? (
-            <form action={promoteMember}>
-              <Button type="submit">Promote to organiser</Button>
-            </form>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Each space must keep at least one organiser. Promotion is only available for members.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+
+      <MemberActionsCard membership={membership} promoteAction={promoteMember} />
+
+      <MemberActivityCard />
     </div>
   )
 }

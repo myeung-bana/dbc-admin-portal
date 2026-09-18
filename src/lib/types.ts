@@ -4,7 +4,17 @@ export type Space = {
   slug: string
   description?: string | null
   status: 'active' | 'archived'
+  visibility: 'public' | 'invite_only'
+  logo_url?: string | null
   created_at: string
+}
+
+export type SpaceMembershipUser = {
+  id: string
+  email?: string | null
+  displayName?: string | null
+  avatarUrl?: string | null
+  createdAt?: string | null
 }
 
 export type SpaceMembership = {
@@ -13,11 +23,21 @@ export type SpaceMembership = {
   user_id: string
   role: 'organiser' | 'member' | 'casual'
   status: 'pending' | 'active'
-  user?: {
-    id: string
-    email?: string | null
-    displayName?: string | null
-  } | null
+  created_at?: string
+  user?: SpaceMembershipUser | null
+  invited_by_user?: SpaceMembershipUser | null
+}
+
+export type SpaceInvite = {
+  id: string
+  space_id: string
+  code: string
+  role: 'member' | 'casual'
+  label?: string | null
+  email?: string | null
+  expires_at: string
+  status: 'open' | 'redeemed' | 'revoked' | 'expired'
+  created_at: string
 }
 
 export type Session = {

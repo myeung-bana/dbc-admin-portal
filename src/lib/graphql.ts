@@ -69,20 +69,37 @@ export async function callAdminFunction<T>(
   path: string,
   payload: Record<string, unknown>,
 ): Promise<GraphqlResult<T>> {
-  const { body: json } = await nhost.functions.post<{
-    ok: boolean
-    data?: T
-    error?: string
-    details?: unknown
-  }>(path, payload)
+  try {
+    const { body: json } = await nhost.functions.post<{
+      ok: boolean
+      data?: T
+      error?: string
+      details?: unknown
+    }>(path, payload)
 
-  if (!json.ok) {
+    if (!json.ok) {
+      return {
+        ok: false,
+        error: json.error ?? 'Function call failed',
+        details: json.details,
+      }
+    }
+
+    return { ok: true, data: json.data as T }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Function call failed'
+    if (message.includes('item not found')) {
+      return {
+        ok: false,
+        error: `Backend function ${path} is not deployed yet. Push the latest dbc-nhost changes to your Nhost project.`,
+        details: error,
+      }
+    }
+
     return {
       ok: false,
-      error: json.error ?? 'Function call failed',
-      details: json.details,
+      error: message,
+      details: error,
     }
   }
-
-  return { ok: true, data: json.data as T }
 }

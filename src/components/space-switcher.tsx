@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { SpaceLogo } from '@/components/space-logo'
 import {
   Select,
   SelectContent,
@@ -22,18 +23,18 @@ export function SpaceSwitcher({ spaces, activeSpaceId }: SpaceSwitcherProps) {
     return null
   }
 
-  const items = spaces.map((space) => ({
-    value: space.id,
-    label: space.name,
-  }))
-  const value =
-    spaces.find((space) => space.id === activeSpaceId)?.id ?? spaces[0]?.id
+  const activeSpace =
+    spaces.find((space) => space.id === activeSpaceId) ?? spaces[0] ?? null
+  const value = activeSpace?.id
 
   return (
     <div className="flex items-center gap-2">
+      {activeSpace ? (
+        <SpaceLogo name={activeSpace.name} logoUrl={activeSpace.logo_url} size="sm" />
+      ) : null}
       <span className="text-sm text-muted-foreground">Space:</span>
       <Select
-        items={items}
+        items={spaces.map((space) => ({ value: space.id, label: space.name }))}
         value={value}
         onValueChange={async (spaceId) => {
           if (!spaceId) return
@@ -51,7 +52,10 @@ export function SpaceSwitcher({ spaces, activeSpaceId }: SpaceSwitcherProps) {
         <SelectContent>
           {spaces.map((space) => (
             <SelectItem key={space.id} value={space.id}>
-              {space.name}
+              <span className="flex items-center gap-2">
+                <SpaceLogo name={space.name} logoUrl={space.logo_url} size="sm" />
+                <span>{space.name}</span>
+              </span>
             </SelectItem>
           ))}
         </SelectContent>

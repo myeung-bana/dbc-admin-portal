@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { updateSpaceAction } from '@/app/actions/admin'
+import { SpaceLogoEditor } from '@/components/settings/space-logo-editor'
+import { MembershipStatusBadge } from '@/components/status-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -34,6 +36,7 @@ type SpaceDetailTabsProps = {
 export function SpaceDetailTabs({ space, memberships }: SpaceDetailTabsProps) {
   const updateSpace = updateSpaceAction.bind(null, space.id)
   const [status, setStatus] = useState(space.status)
+  const [visibility, setVisibility] = useState(space.visibility)
 
   return (
     <Tabs defaultValue="general">
@@ -49,6 +52,12 @@ export function SpaceDetailTabs({ space, memberships }: SpaceDetailTabsProps) {
           </CardHeader>
           <CardContent>
             <form action={updateSpace} className="space-y-4">
+              <SpaceLogoEditor
+                spaceId={space.id}
+                name={space.name}
+                initialLogoUrl={space.logo_url}
+              />
+
               <div className="space-y-2">
                 <Label htmlFor="name">Space name</Label>
                 <Input id="name" name="name" defaultValue={space.name} required />
@@ -56,6 +65,9 @@ export function SpaceDetailTabs({ space, memberships }: SpaceDetailTabsProps) {
               <div className="space-y-2">
                 <Label htmlFor="slug">Slug</Label>
                 <Input id="slug" name="slug" defaultValue={space.slug} required />
+                <p className="text-xs text-muted-foreground">
+                  Unique handle for this space, like an Instagram username.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
@@ -65,6 +77,22 @@ export function SpaceDetailTabs({ space, memberships }: SpaceDetailTabsProps) {
                   rows={3}
                   defaultValue={space.description ?? ''}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="visibility">Visibility</Label>
+                <Select
+                  value={visibility}
+                  onValueChange={(value) => setVisibility(value as Space['visibility'])}
+                >
+                  <SelectTrigger id="visibility" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">Public</SelectItem>
+                    <SelectItem value="invite_only">Invite only</SelectItem>
+                  </SelectContent>
+                </Select>
+                <input type="hidden" name="visibility" value={visibility} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
@@ -115,7 +143,9 @@ export function SpaceDetailTabs({ space, memberships }: SpaceDetailTabsProps) {
                       <TableCell>
                         <Badge>{membership.role}</Badge>
                       </TableCell>
-                      <TableCell>{membership.status}</TableCell>
+                      <TableCell>
+                        <MembershipStatusBadge status={membership.status} />
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
