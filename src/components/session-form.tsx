@@ -1,9 +1,11 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import type { ActionResult } from '@/lib/actions/result'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useActionForm } from '@/hooks/use-action-form'
 import {
   combineLocalDateTime,
   toLocalDateInput,
@@ -12,11 +14,13 @@ import {
 import type { MasterCourt, MasterLocation, Session } from '@/lib/types'
 
 type SessionFormProps = {
-  action: (formData: FormData) => void | Promise<void>
+  action: (formData: FormData) => Promise<ActionResult>
   locations: MasterLocation[]
   courts: MasterCourt[]
   session?: Session
   submitLabel?: string
+  successMessage: string
+  errorMessage?: string
 }
 
 const selectClassName =
@@ -28,11 +32,15 @@ export function SessionForm({
   courts,
   session,
   submitLabel = 'Save session',
+  successMessage,
+  errorMessage,
 }: SessionFormProps) {
   const initialLocationId =
     session?.location?.id ?? session?.court?.location?.id ?? ''
   const initialCourtId = session?.court?.id ?? ''
 
+  const [title, setTitle] = useState(session?.title ?? '')
+  const [capacity, setCapacity] = useState(String(session?.capacity ?? 15))
   const [locationId, setLocationId] = useState(initialLocationId)
   const [courtId, setCourtId] = useState(initialCourtId)
   const [sessionDate, setSessionDate] = useState(
@@ -42,6 +50,14 @@ export function SessionForm({
     session ? toLocalTimeInput(session.starts_at) : '',
   )
   const [endTime, setEndTime] = useState(session ? toLocalTimeInput(session.ends_at) : '')
+  const [status, setStatus] = useState<'scheduled' | 'cancelled'>(
+    session?.status ?? 'scheduled',
+  )
+
+  const { onSubmit, pending } = useActionForm(action, {
+    successMessage,
+    errorMessage,
+  })
 
   const filteredCourts = useMemo(
     () => courts.filter((court) => court.location?.id === locationId),
@@ -63,10 +79,16 @@ export function SessionForm({
   }
 
   return (
-    <form action={action} className="grid gap-4 md:grid-cols-2">
+    <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2">
       <div className="space-y-2 md:col-span-2">
         <Label htmlFor="title">Title</Label>
-        <Input id="title" name="title" defaultValue={session?.title ?? ''} required />
+        <Input
+          id="title"
+          name="title"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          required
+        />
       </div>
 
       <div className="space-y-2">
@@ -86,7 +108,8 @@ export function SessionForm({
           id="capacity"
           name="capacity"
           type="number"
-          defaultValue={session?.capacity ?? 15}
+          value={capacity}
+          onChange={(event) => setCapacity(event.target.value)}
           min={1}
         />
       </div>
@@ -161,7 +184,10 @@ export function SessionForm({
           <select
             id="status"
             name="status"
-            defaultValue={session.status}
+            value={status}
+            onChange={(event) =>
+              setStatus(event.target.value as 'scheduled' | 'cancelled')
+            }
             className={selectClassName}
           >
             <option value="scheduled">scheduled</option>
@@ -173,7 +199,9 @@ export function SessionForm({
       )}
 
       <div className="md:col-span-2">
-        <Button type="submit">{submitLabel}</Button>
+        <Button type="submit" disabled={pending}>
+          {pending ? 'Saving…' : submitLabel}
+        </Button>
       </div>
     </form>
   )

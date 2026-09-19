@@ -6,6 +6,7 @@ import {
   type StoredSession,
 } from '@nhost/nhost-js'
 import { getPublicNhostConfig } from './config'
+import { getAuthUrl, isSessionExpired } from './session-cookie'
 
 let browserClient: ReturnType<typeof createClient> | null = null
 
@@ -33,15 +34,24 @@ export async function syncSessionCookie(session: StoredSession | null) {
 export async function logoutClientSession() {
   const nhost = getBrowserNhost()
   const session = nhost.getUserSession()
-
-  if (session?.refreshToken) {
-    try {
-      await nhost.auth.signOut({ refreshToken: session.refreshToken })
-    } catch {
-      // Remote sign-out can fail when the session is already expired; still clear locally.
-    }
-  }
+  const refreshToken = session?.refreshToken
 
   nhost.sessionStorage.remove()
   await syncSessionCookie(null)
+
+  if (!refreshToken || !session || isSessionExpired(session)) {
+    return
+  }
+
+  const { subdomain, region } = getPublicNhostConfig()
+
+  try {
+    await fetch(`${getAuthUrl(subdomain, region)}/signout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    })
+  } catch {
+    // User is already logged out locally.
+  }
 }

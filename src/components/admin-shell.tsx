@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
 import { SpaceSwitcher } from '@/components/space-switcher'
+import { ADMIN_APP_SHORT } from '@/lib/brand'
 import type { AdminViewMode } from '@/lib/admin-view-mode'
 import type { Space } from '@/lib/types'
 
@@ -100,7 +101,7 @@ export function AdminShell({
                 render={<Link href={homeHref} />}
               >
                 <CommandIcon className="size-5!" />
-                <span className="text-base font-semibold">DBC Admin</span>
+                <span className="text-base font-semibold">{ADMIN_APP_SHORT}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

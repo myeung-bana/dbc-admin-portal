@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ADMIN_APP_NAME, ADMIN_TAGLINE } from "@/lib/brand";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DBC Admin Portal",
-  description: "Super Admin and Organiser portal for DBC Booking",
+  title: ADMIN_APP_NAME,
+  description: ADMIN_TAGLINE,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -27,7 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className={`${geistSans.className} min-h-full flex flex-col font-sans`}>
         <TooltipProvider>{children}</TooltipProvider>
-        <Toaster />
+        <Toaster richColors closeButton position="top-right" />
       </body>
     </html>
   );

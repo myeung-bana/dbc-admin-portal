@@ -51,9 +51,13 @@ export function MemberAccountCard({ user }: MemberAccountCardProps) {
 
 type MemberMembershipCardProps = {
   membership: SpaceMembership
+  passBalance?: number
 }
 
-export function MemberMembershipCard({ membership }: MemberMembershipCardProps) {
+export function MemberMembershipCard({
+  membership,
+  passBalance,
+}: MemberMembershipCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -63,6 +67,9 @@ export function MemberMembershipCard({ membership }: MemberMembershipCardProps) 
         <dl className="space-y-4">
           <DetailRow label="Role" value={membership.role} />
           <DetailRow label="Status" value={<MembershipStatusBadge status={membership.status} />} />
+          {membership.role === 'casual' ? (
+            <DetailRow label="Pass credits" value={passBalance ?? 0} />
+          ) : null}
           <DetailRow label="Joined space" value={formatDate(membership.created_at)} />
           <DetailRow label="Invited by" value={formatUserLabel(membership.invited_by_user)} />
         </dl>

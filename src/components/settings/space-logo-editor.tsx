@@ -2,8 +2,8 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import { removeSpaceLogoAction, uploadSpaceLogoAction } from '@/app/actions/admin'
+import { handleActionResult } from '@/lib/toast/action-feedback'
 import { SpaceLogo } from '@/components/space-logo'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -32,31 +32,35 @@ export function SpaceLogoEditor({ spaceId, name, initialLogoUrl }: SpaceLogoEdit
 
     startUpload(async () => {
       const result = await uploadSpaceLogoAction(spaceId, formData)
-      if (!result.ok) {
-        toast.error(result.error)
-        return
+      const ok = handleActionResult(result, {
+        successMessage: 'Space logo updated',
+        errorMessage: 'Could not upload logo',
+        onSuccess: (data) => {
+          if (data?.logoUrl) {
+            setLogoUrl(data.logoUrl)
+            setLogoRevision((current) => current + 1)
+          }
+        },
+        onRefresh: () => router.refresh(),
+      })
+      if (ok) {
+        event.target.value = ''
       }
-
-      setLogoUrl(result.data.logoUrl)
-      setLogoRevision((current) => current + 1)
-      toast.success('Space logo updated')
-      router.refresh()
-      event.target.value = ''
     })
   }
 
   function onRemoveLogo() {
     startRemove(async () => {
       const result = await removeSpaceLogoAction(spaceId)
-      if (!result.ok) {
-        toast.error(result.error)
-        return
-      }
-
-      setLogoUrl(null)
-      setLogoRevision((current) => current + 1)
-      toast.success('Space logo removed')
-      router.refresh()
+      handleActionResult(result, {
+        successMessage: 'Space logo removed',
+        errorMessage: 'Could not remove logo',
+        onSuccess: () => {
+          setLogoUrl(null)
+          setLogoRevision((current) => current + 1)
+        },
+        onRefresh: () => router.refresh(),
+      })
     })
   }
 

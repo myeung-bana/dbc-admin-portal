@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import { updateActiveSpaceSettingsAction } from '@/app/actions/admin'
+import { handleActionResult } from '@/lib/toast/action-feedback'
+import { SpaceJoinQrCard } from '@/components/space-join-qr-card'
 import { SpaceLogoEditor } from '@/components/settings/space-logo-editor'
 import { SpaceLogo } from '@/components/space-logo'
 import { SpaceStatusBadge, SpaceVisibilityBadge } from '@/components/status-badge'
@@ -64,13 +65,12 @@ export function SpaceSettingsCard({
     formData.set('visibility', visibility)
 
     startSave(async () => {
-      try {
-        await updateActiveSpaceSettingsAction(spaceId, formData)
-        toast.success('Space settings saved')
-        router.refresh()
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to save settings')
-      }
+      const result = await updateActiveSpaceSettingsAction(spaceId, formData)
+      handleActionResult(result, {
+        successMessage: 'Space settings saved',
+        errorMessage: 'Could not save settings',
+        onRefresh: () => router.refresh(),
+      })
     })
   }
 
@@ -159,4 +159,8 @@ export function SpaceSettingsCard({
       </CardContent>
     </Card>
   )
+}
+
+export function SpaceJoinLinksCard({ slug }: { slug: string }) {
+  return <SpaceJoinQrCard slug={slug} />
 }

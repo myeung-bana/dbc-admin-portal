@@ -1,19 +1,16 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
-
-function unwrapActionResult<T>(
-  result: { ok: true; data: T } | { ok: false; error: string },
-): T {
-  if (!result.ok) {
-    throw new Error(result.error)
-  }
-
-  return result.data
-}
+import {
+  actionError,
+  actionSuccess,
+  validationError,
+  type ActionResult,
+} from '@/lib/actions/result'
 import { createSpace, archiveSpace, updateSpace, updateSpaceLogo, updateSpaceSettings } from '@/lib/data/spaces'
 import {
+  assignPassCredits,
+  changeMemberRole,
   createSpaceInvite,
   inviteExistingMember,
   promoteMember,
@@ -35,6 +32,8 @@ import {
 import type { SessionInput } from '@/lib/schemas/session.schema'
 import { createSpaceSchema, updateSpaceSchema, updateSpaceSettingsSchema } from '@/lib/schemas/space.schema'
 import {
+  assignPassCreditsSchema,
+  changeMemberRoleSchema,
   createSpaceInviteSchema,
   inviteExistingMemberSchema,
 } from '@/lib/schemas/membership.schema'
@@ -45,7 +44,6 @@ import {
   toBulkSessionInserts,
   type ResolvedBulkSessionRow,
 } from '@/lib/sessions/bulk-import'
-
 import {
   countrySchema,
   courtSchema,
@@ -63,7 +61,13 @@ import {
   SPACE_LOGO_MAX_BYTES,
 } from '@/lib/spaces/logo-constants'
 
-export async function createSpaceAction(formData: FormData) {
+export type { ActionResult } from '@/lib/actions/result'
+
+function parseValidationError(error: { issues: Array<{ message?: string }> }) {
+  return validationError(error.issues[0]?.message ?? 'Invalid input')
+}
+
+export async function createSpaceAction(formData: FormData): Promise<ActionResult> {
   const parsed = createSpaceSchema.safeParse({
     name: formData.get('name'),
     slug: formData.get('slug') || undefined,
@@ -74,16 +78,22 @@ export async function createSpaceAction(formData: FormData) {
   })
 
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+    return parseValidationError(parsed.error)
   }
 
-  const result = unwrapActionResult(await createSpace(parsed.data))
+  const result = await createSpace(parsed.data)
+  if (!result.ok) {
+    return actionError(result.error)
+  }
 
   revalidatePath('/master-console/spaces')
-  redirect(`/master-console/spaces/${result.space.id}`)
+  return actionSuccess(undefined, `/master-console/spaces/${result.data.space.id}`)
 }
 
-export async function updateSpaceAction(spaceId: string, formData: FormData) {
+export async function updateSpaceAction(
+  spaceId: string,
+  formData: FormData,
+): Promise<ActionResult> {
   const parsed = updateSpaceSchema.safeParse({
     name: formData.get('name'),
     slug: formData.get('slug'),
@@ -93,14 +103,18 @@ export async function updateSpaceAction(spaceId: string, formData: FormData) {
   })
 
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+    return parseValidationError(parsed.error)
   }
 
-  unwrapActionResult(await updateSpace(spaceId, parsed.data))
+  const result = await updateSpace(spaceId, parsed.data)
+  if (!result.ok) {
+    return actionError(result.error)
+  }
 
   revalidatePath('/master-console/spaces')
   revalidatePath(`/master-console/spaces/${spaceId}`)
   revalidatePath('/dashboard/settings')
+  return actionSuccess()
 }
 
 function validateLogoFile(file: File | null) {
@@ -120,10 +134,13 @@ function validateLogoFile(file: File | null) {
   return { ok: true as const, file }
 }
 
-export async function updateActiveSpaceSettingsAction(spaceId: string, formData: FormData) {
+export async function updateActiveSpaceSettingsAction(
+  spaceId: string,
+  formData: FormData,
+): Promise<ActionResult> {
   const context = await requireActiveSpace()
   if (context.activeSpaceId !== spaceId) {
-    throw new Error('You can only edit the active space')
+    return actionError('You can only edit the active space')
   }
 
   const parsed = updateSpaceSettingsSchema.safeParse({
@@ -134,17 +151,18 @@ export async function updateActiveSpaceSettingsAction(spaceId: string, formData:
   })
 
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+    return parseValidationError(parsed.error)
   }
 
   const result = await updateSpaceSettings(spaceId, parsed.data)
   if (!result.ok) {
-    throw new Error(result.error)
+    return actionError(result.error)
   }
 
   revalidatePath('/dashboard/settings')
   revalidatePath('/dashboard')
   revalidatePath('/members')
+  return actionSuccess()
 }
 
 async function assertCanManageSpace(spaceId: string) {
@@ -229,34 +247,40 @@ export async function removeSpaceLogoAction(spaceId: string) {
   return { ok: true as const, data: { space: result.data.update_spaces_by_pk } }
 }
 
-export async function archiveSpaceAction(spaceId: string) {
+export async function archiveSpaceAction(spaceId: string): Promise<ActionResult> {
   const result = await archiveSpace(spaceId)
-  if (!result.ok) return result
+  if (!result.ok) {
+    return actionError(result.error)
+  }
+
   revalidatePath('/master-console/spaces')
-  return result
+  return actionSuccess()
 }
 
 export async function searchUsersAction(spaceId: string, query: string) {
   return searchUsers(spaceId, query)
 }
 
-export async function inviteExistingMemberAction(spaceId: string, formData: FormData) {
+export async function inviteExistingMemberAction(
+  spaceId: string,
+  formData: FormData,
+): Promise<ActionResult> {
   const parsed = inviteExistingMemberSchema.safeParse({
     userId: formData.get('userId'),
     role: formData.get('role') || 'member',
   })
 
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+    return parseValidationError(parsed.error)
   }
 
   const result = await inviteExistingMember(spaceId, parsed.data)
   if (!result.ok) {
-    throw new Error(result.error)
+    return actionError(result.error)
   }
 
   revalidatePath('/members')
-  redirect('/members')
+  return actionSuccess(undefined, '/members')
 }
 
 export async function createSpaceInviteAction(spaceId: string, formData: FormData) {
@@ -279,44 +303,107 @@ export async function createSpaceInviteAction(spaceId: string, formData: FormDat
   return { ok: true as const, data: result.data.invite }
 }
 
-export async function revokeSpaceInviteAction(inviteId: string) {
+export async function revokeSpaceInviteAction(inviteId: string): Promise<ActionResult> {
   const result = await revokeSpaceInvite(inviteId)
   if (!result.ok) {
-    throw new Error(result.error)
+    return actionError(result.error)
   }
 
   revalidatePath('/members')
-  return result
+  return actionSuccess()
 }
 
-export async function promoteMemberAction(spaceId: string, userId: string) {
-  unwrapActionResult(await promoteMember(spaceId, userId))
+export async function promoteMemberAction(
+  spaceId: string,
+  userId: string,
+): Promise<ActionResult> {
+  const result = await promoteMember(spaceId, userId)
+  if (!result.ok) {
+    return actionError(result.error)
+  }
+
   revalidatePath('/members')
   revalidatePath(`/members/${userId}`)
+  return actionSuccess()
 }
 
-async function resolveSessionInput(input: SessionInput): Promise<SessionInput> {
+export async function changeMemberRoleAction(
+  spaceId: string,
+  userId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = changeMemberRoleSchema.safeParse({
+    role: formData.get('role'),
+  })
+
+  if (!parsed.success) {
+    return parseValidationError(parsed.error)
+  }
+
+  const result = await changeMemberRole(spaceId, userId, parsed.data.role)
+  if (!result.ok) {
+    return actionError(result.error)
+  }
+
+  revalidatePath('/members')
+  revalidatePath(`/members/${userId}`)
+  return actionSuccess()
+}
+
+export async function assignPassCreditsAction(
+  spaceId: string,
+  userId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = assignPassCreditsSchema.safeParse({
+    amount: formData.get('amount'),
+    note: formData.get('note') || undefined,
+  })
+
+  if (!parsed.success) {
+    return parseValidationError(parsed.error)
+  }
+
+  const result = await assignPassCredits(
+    spaceId,
+    userId,
+    parsed.data.amount,
+    parsed.data.note,
+  )
+  if (!result.ok) {
+    return actionError(result.error)
+  }
+
+  revalidatePath('/members')
+  revalidatePath(`/members/${userId}`)
+  return actionSuccess()
+}
+
+async function resolveSessionInput(input: SessionInput): Promise<ActionResult<SessionInput>> {
   if (!input.courtId) {
-    return input
+    return actionSuccess(input)
   }
 
   const courtResult = await getCourt(input.courtId)
   if (!courtResult.ok || !courtResult.data.master_courts_by_pk) {
-    throw new Error('Selected court was not found')
+    return actionError('Selected court was not found')
   }
 
   const courtLocationId = courtResult.data.master_courts_by_pk.location?.id
   if (input.locationId && courtLocationId && input.locationId !== courtLocationId) {
-    throw new Error('Court does not belong to the selected location')
+    return actionError('Court does not belong to the selected location')
   }
 
-  return {
+  return actionSuccess({
     ...input,
     locationId: input.locationId || courtLocationId || '',
-  }
+  })
 }
 
-export async function createSessionAction(spaceId: string, formData: FormData) {
+export async function createSessionAction(
+  spaceId: string,
+  formData: FormData,
+): Promise<ActionResult> {
   const parsed = sessionSchema.safeParse({
     title: formData.get('title'),
     startsAt: formData.get('startsAt'),
@@ -328,17 +415,30 @@ export async function createSessionAction(spaceId: string, formData: FormData) {
   })
 
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+    return parseValidationError(parsed.error)
   }
 
-  const input = await resolveSessionInput(parsed.data)
-  const result = unwrapActionResult(await createSession(spaceId, input))
+  const resolved = await resolveSessionInput(parsed.data)
+  if (!resolved.ok) {
+    return resolved
+  }
+
+  const result = await createSession(spaceId, resolved.data!)
+  if (!result.ok) {
+    return actionError(result.error)
+  }
 
   revalidatePath('/dashboard/sessions')
-  redirect(`/dashboard/sessions/${result.insert_sessions_one.id}`)
+  return actionSuccess(
+    undefined,
+    `/dashboard/sessions/${result.data.insert_sessions_one.id}`,
+  )
 }
 
-export async function updateSessionAction(sessionId: string, formData: FormData) {
+export async function updateSessionAction(
+  sessionId: string,
+  formData: FormData,
+): Promise<ActionResult> {
   const parsed = sessionSchema.safeParse({
     title: formData.get('title'),
     startsAt: formData.get('startsAt'),
@@ -350,106 +450,158 @@ export async function updateSessionAction(sessionId: string, formData: FormData)
   })
 
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+    return parseValidationError(parsed.error)
   }
 
-  const input = await resolveSessionInput(parsed.data)
-  unwrapActionResult(await updateSession(sessionId, input))
+  const resolved = await resolveSessionInput(parsed.data)
+  if (!resolved.ok) {
+    return resolved
+  }
+
+  const result = await updateSession(sessionId, resolved.data!)
+  if (!result.ok) {
+    return actionError(result.error)
+  }
 
   revalidatePath('/dashboard/sessions')
   revalidatePath(`/dashboard/sessions/${sessionId}`)
-  redirect(`/dashboard/sessions/${sessionId}`)
+  return actionSuccess()
 }
 
-export async function createCountryAction(formData: FormData) {
+export async function createCountryAction(formData: FormData): Promise<ActionResult> {
   const parsed = countrySchema.safeParse({
     name: formData.get('name'),
     code: formData.get('code'),
   })
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+    return parseValidationError(parsed.error)
   }
 
-  const result = unwrapActionResult(await createCountry(parsed.data))
+  const result = await createCountry(parsed.data)
+  if (!result.ok) {
+    return actionError(result.error)
+  }
+
   revalidatePath('/master-console/master-data/countries')
-  redirect(`/master-console/master-data/countries/${result.insert_master_countries_one.id}`)
+  return actionSuccess(
+    undefined,
+    `/master-console/master-data/countries/${result.data.insert_master_countries_one.id}`,
+  )
 }
 
-export async function updateCountryAction(countryId: string, formData: FormData) {
+export async function updateCountryAction(
+  countryId: string,
+  formData: FormData,
+): Promise<ActionResult> {
   const parsed = updateCountrySchema.safeParse({
     name: formData.get('name'),
     code: formData.get('code'),
   })
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+    return parseValidationError(parsed.error)
   }
 
-  unwrapActionResult(await updateCountry(countryId, parsed.data))
+  const result = await updateCountry(countryId, parsed.data)
+  if (!result.ok) {
+    return actionError(result.error)
+  }
+
   revalidatePath('/master-console/master-data/countries')
   revalidatePath(`/master-console/master-data/countries/${countryId}`)
+  return actionSuccess()
 }
 
-export async function createLocationAction(formData: FormData) {
+export async function createLocationAction(formData: FormData): Promise<ActionResult> {
   const parsed = locationSchema.safeParse({
     name: formData.get('name'),
     countryId: formData.get('countryId'),
     address: formData.get('address') || undefined,
   })
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+    return parseValidationError(parsed.error)
   }
 
-  const result = unwrapActionResult(await createLocation(parsed.data))
+  const result = await createLocation(parsed.data)
+  if (!result.ok) {
+    return actionError(result.error)
+  }
+
   const countryId = parsed.data.countryId
   revalidatePath('/master-console/master-data/locations')
   revalidatePath(`/master-console/master-data/countries/${countryId}`)
-  redirect(`/master-console/master-data/locations/${result.insert_master_locations_one.id}`)
+  return actionSuccess(
+    undefined,
+    `/master-console/master-data/locations/${result.data.insert_master_locations_one.id}`,
+  )
 }
 
-export async function updateLocationAction(locationId: string, formData: FormData) {
+export async function updateLocationAction(
+  locationId: string,
+  formData: FormData,
+): Promise<ActionResult> {
   const parsed = updateLocationSchema.safeParse({
     name: formData.get('name'),
     countryId: formData.get('countryId'),
     address: formData.get('address') || undefined,
   })
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+    return parseValidationError(parsed.error)
   }
 
-  unwrapActionResult(await updateLocation(locationId, parsed.data))
+  const result = await updateLocation(locationId, parsed.data)
+  if (!result.ok) {
+    return actionError(result.error)
+  }
+
   revalidatePath('/master-console/master-data/locations')
   revalidatePath(`/master-console/master-data/locations/${locationId}`)
   revalidatePath(`/master-console/master-data/countries/${parsed.data.countryId}`)
+  return actionSuccess()
 }
 
-export async function createCourtAction(formData: FormData) {
+export async function createCourtAction(formData: FormData): Promise<ActionResult> {
   const parsed = courtSchema.safeParse({
     name: formData.get('name'),
     locationId: formData.get('locationId'),
   })
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+    return parseValidationError(parsed.error)
   }
 
-  const result = unwrapActionResult(await createCourt(parsed.data))
+  const result = await createCourt(parsed.data)
+  if (!result.ok) {
+    return actionError(result.error)
+  }
+
   revalidatePath('/master-console/master-data/courts')
   revalidatePath(`/master-console/master-data/locations/${parsed.data.locationId}`)
-  redirect(`/master-console/master-data/courts/${result.insert_master_courts_one.id}`)
+  return actionSuccess(
+    undefined,
+    `/master-console/master-data/courts/${result.data.insert_master_courts_one.id}`,
+  )
 }
 
-export async function updateCourtAction(courtId: string, formData: FormData) {
+export async function updateCourtAction(
+  courtId: string,
+  formData: FormData,
+): Promise<ActionResult> {
   const parsed = updateCourtSchema.safeParse({
     name: formData.get('name'),
     locationId: formData.get('locationId'),
   })
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid input')
+    return parseValidationError(parsed.error)
   }
 
-  unwrapActionResult(await updateCourt(courtId, parsed.data))
+  const result = await updateCourt(courtId, parsed.data)
+  if (!result.ok) {
+    return actionError(result.error)
+  }
+
   revalidatePath('/master-console/master-data/courts')
   revalidatePath(`/master-console/master-data/courts/${courtId}`)
   revalidatePath(`/master-console/master-data/locations/${parsed.data.locationId}`)
+  return actionSuccess()
 }
 
 export type BulkImportPreviewResult =
@@ -513,4 +665,3 @@ export async function bulkImportSessionsAction(
     preview: false,
   }
 }
-

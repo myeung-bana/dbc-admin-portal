@@ -2,12 +2,16 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import QRCode from 'react-qr-code'
-import { toast } from 'sonner'
 import {
   createSpaceInviteAction,
   inviteExistingMemberAction,
   searchUsersAction,
 } from '@/app/actions/admin'
+import {
+  handleActionResult,
+  toastActionError,
+  toastActionSuccess,
+} from '@/lib/toast/action-feedback'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -79,7 +83,7 @@ function ExistingUserInviteTab({ spaceId }: { spaceId: string }) {
       startSearch(async () => {
         const result = await searchUsersAction(spaceId, query.trim())
         if (!result.ok) {
-          toast.error(result.error)
+          toastActionError(result.error)
           setResults([])
           return
         }
@@ -93,7 +97,7 @@ function ExistingUserInviteTab({ spaceId }: { spaceId: string }) {
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!selectedUser) {
-      toast.error('Select a user first')
+      toastActionError('Select a user first')
       return
     }
 
@@ -101,11 +105,11 @@ function ExistingUserInviteTab({ spaceId }: { spaceId: string }) {
     formData.set('userId', selectedUser.id)
 
     startSubmit(async () => {
-      try {
-        await inviteExistingMemberAction(spaceId, formData)
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to send invite')
-      }
+      const result = await inviteExistingMemberAction(spaceId, formData)
+      handleActionResult(result, {
+        successMessage: 'Invite sent',
+        errorMessage: 'Failed to send invite',
+      })
     })
   }
 
@@ -116,7 +120,7 @@ function ExistingUserInviteTab({ spaceId }: { spaceId: string }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Choose someone who already has a DBC account. They will see a pending invite in the
+          Choose someone who already has a Gachi App account. They will see a pending invite in the
           player app and can accept from Profile.
         </p>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -200,12 +204,13 @@ function NewInvitationTab({ spaceId }: { spaceId: string }) {
 
     startTransition(async () => {
       const result = await createSpaceInviteAction(spaceId, formData)
-      if (!result.ok) {
-        toast.error(result.error)
+      if (!handleActionResult(result, {
+        successMessage: 'Invite code created',
+        errorMessage: 'Could not create invite code',
+        onSuccess: (data) => setInvite(data ?? null),
+      })) {
         return
       }
-      setInvite(result.data)
-      toast.success('Invite code created')
       event.currentTarget.reset()
     })
   }
@@ -215,9 +220,9 @@ function NewInvitationTab({ spaceId }: { spaceId: string }) {
   async function copyValue(value: string, label: string) {
     try {
       await navigator.clipboard.writeText(value)
-      toast.success(`${label} copied`)
+      toastActionSuccess(`${label} copied`)
     } catch {
-      toast.error(`Could not copy ${label.toLowerCase()}`)
+      toastActionError(`Could not copy ${label.toLowerCase()}`)
     }
   }
 

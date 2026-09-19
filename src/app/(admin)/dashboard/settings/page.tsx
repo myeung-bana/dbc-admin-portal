@@ -1,7 +1,7 @@
 import {
   AccountSettingsCard,
 } from '@/components/settings/settings-cards'
-import { SpaceSettingsCard } from '@/components/settings/space-settings-form'
+import { SpaceSettingsCard, SpaceJoinLinksCard } from '@/components/settings/space-settings-form'
 import { requireActiveSpace } from '@/lib/admin-context'
 import { listSessions } from '@/lib/data/sessions'
 import { getSpace, listSpaceMemberships } from '@/lib/data/spaces'
@@ -45,6 +45,8 @@ export default async function SettingsPage() {
           roles={context.roles}
         />
       </div>
+
+      <SpaceJoinLinksCard slug={space.slug} />
     </div>
   )
 }

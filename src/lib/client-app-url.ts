@@ -11,3 +11,10 @@ export function buildJoinInviteUrl(code: string) {
   const base = getClientAppUrl()
   return `${base}/join?code=${encodeURIComponent(code)}`
 }
+
+export type StandingJoinIntent = 'follow' | 'casual' | 'member'
+
+export function buildStandingJoinUrl(slug: string, intent: StandingJoinIntent) {
+  const base = getClientAppUrl()
+  return `${base}/join/${encodeURIComponent(slug)}?intent=${intent}`
+}

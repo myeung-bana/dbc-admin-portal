@@ -7,7 +7,11 @@ type GraphqlResult<T> =
   | { ok: false; error: string; details?: unknown }
 
 function formatGraphqlError(message: string) {
-  if (message.includes("field 'spaces' not found in type: 'query_root'")) {
+  if (
+    message.includes("field 'spaces' not found in type: 'query_root'") ||
+    message.includes("field 'space_follows' not found in type: 'query_root'") ||
+    message.includes("field 'pass_balances' not found in type: 'query_root'")
+  ) {
     return 'The Nhost backend schema is not deployed yet. Push dbc-nhost migrations and metadata to your cloud project, then try again.'
   }
 

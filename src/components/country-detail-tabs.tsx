@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { updateCountryAction } from '@/app/actions/admin'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useActionForm } from '@/hooks/use-action-form'
 import type { MasterCountry, MasterLocation } from '@/lib/types'
 
 type CountryDetailTabsProps = {
@@ -23,7 +25,20 @@ type CountryDetailTabsProps = {
 }
 
 export function CountryDetailTabs({ country, locations }: CountryDetailTabsProps) {
-  const updateCountry = updateCountryAction.bind(null, country.id)
+  const [name, setName] = useState(country.name)
+  const [code, setCode] = useState(country.code)
+  const { onSubmit, pending } = useActionForm(
+    updateCountryAction.bind(null, country.id),
+    {
+      successMessage: 'Country saved',
+      errorMessage: 'Could not save country',
+    },
+  )
+
+  useEffect(() => {
+    setName(country.name)
+    setCode(country.code)
+  }, [country.id, country.name, country.code])
 
   return (
     <Tabs defaultValue="general">
@@ -38,16 +53,31 @@ export function CountryDetailTabs({ country, locations }: CountryDetailTabsProps
             <CardTitle>General Details</CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={updateCountry} className="space-y-4">
+            <form onSubmit={onSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" defaultValue={country.name} required />
+                <Input
+                  id="name"
+                  name="name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="code">Code</Label>
-                <Input id="code" name="code" defaultValue={country.code} required maxLength={3} />
+                <Input
+                  id="code"
+                  name="code"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  required
+                  maxLength={3}
+                />
               </div>
-              <Button type="submit">Save changes</Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? 'Saving…' : 'Save changes'}
+              </Button>
             </form>
           </CardContent>
         </Card>

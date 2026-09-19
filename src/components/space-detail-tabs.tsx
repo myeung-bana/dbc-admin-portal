@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { updateSpaceAction } from '@/app/actions/admin'
 import { SpaceLogoEditor } from '@/components/settings/space-logo-editor'
 import { MembershipStatusBadge } from '@/components/status-badge'
@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { useActionForm } from '@/hooks/use-action-form'
 import type { Space, SpaceMembership } from '@/lib/types'
 
 type SpaceDetailTabsProps = {
@@ -34,9 +35,26 @@ type SpaceDetailTabsProps = {
 }
 
 export function SpaceDetailTabs({ space, memberships }: SpaceDetailTabsProps) {
-  const updateSpace = updateSpaceAction.bind(null, space.id)
+  const [name, setName] = useState(space.name)
+  const [slug, setSlug] = useState(space.slug)
+  const [description, setDescription] = useState(space.description ?? '')
   const [status, setStatus] = useState(space.status)
   const [visibility, setVisibility] = useState(space.visibility)
+  const { onSubmit, pending } = useActionForm(
+    updateSpaceAction.bind(null, space.id),
+    {
+      successMessage: 'Space saved',
+      errorMessage: 'Could not save space',
+    },
+  )
+
+  useEffect(() => {
+    setName(space.name)
+    setSlug(space.slug)
+    setDescription(space.description ?? '')
+    setStatus(space.status)
+    setVisibility(space.visibility)
+  }, [space.id, space.name, space.slug, space.description, space.status, space.visibility])
 
   return (
     <Tabs defaultValue="general">
@@ -51,7 +69,7 @@ export function SpaceDetailTabs({ space, memberships }: SpaceDetailTabsProps) {
             <CardTitle>General Details</CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={updateSpace} className="space-y-4">
+            <form onSubmit={onSubmit} className="space-y-4">
               <SpaceLogoEditor
                 spaceId={space.id}
                 name={space.name}
@@ -60,11 +78,23 @@ export function SpaceDetailTabs({ space, memberships }: SpaceDetailTabsProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="name">Space name</Label>
-                <Input id="name" name="name" defaultValue={space.name} required />
+                <Input
+                  id="name"
+                  name="name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="slug">Slug</Label>
-                <Input id="slug" name="slug" defaultValue={space.slug} required />
+                <Input
+                  id="slug"
+                  name="slug"
+                  value={slug}
+                  onChange={(event) => setSlug(event.target.value)}
+                  required
+                />
                 <p className="text-xs text-muted-foreground">
                   Unique handle for this space, like an Instagram username.
                 </p>
@@ -75,7 +105,8 @@ export function SpaceDetailTabs({ space, memberships }: SpaceDetailTabsProps) {
                   id="description"
                   name="description"
                   rows={3}
-                  defaultValue={space.description ?? ''}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -107,7 +138,9 @@ export function SpaceDetailTabs({ space, memberships }: SpaceDetailTabsProps) {
                 </Select>
                 <input type="hidden" name="status" value={status} />
               </div>
-              <Button type="submit">Save changes</Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? 'Saving…' : 'Save changes'}
+              </Button>
             </form>
           </CardContent>
         </Card>

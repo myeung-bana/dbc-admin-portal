@@ -38,8 +38,7 @@ export function NavUser({
 
   async function handleLogout() {
     await logoutClientSession()
-    router.push('/login')
-    router.refresh()
+    router.replace('/login')
   }
 
   return (

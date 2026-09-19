@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 import { bulkImportSessionsAction } from '@/app/actions/admin'
+import { toastActionError, toastActionSuccess } from '@/lib/toast/action-feedback'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,7 +26,6 @@ import {
 } from '@/lib/sessions/bulk-import'
 import { formatSessionTimeRange, formatSessionVenue } from '@/lib/sessions/format'
 import type { MasterCourt, MasterLocation, Session } from '@/lib/types'
-import { toast } from 'sonner'
 
 const DAY_OPTIONS = [
   { value: 0, label: 'Sunday' },
@@ -146,7 +146,7 @@ export function SessionsImportForm({ spaceId, locations, courts }: SessionsImpor
   async function validatePreview(payload: string) {
     const result = await importAction(payload, true)
     if (!result.ok) {
-      toast.error(result.error)
+      toastActionError(result.error)
       return
     }
     if ('rows' in result) {
@@ -187,7 +187,7 @@ export function SessionsImportForm({ spaceId, locations, courts }: SessionsImpor
     })
 
     if (rows.length === 0) {
-      toast.error('No sessions generated. Check your dates and day of week.')
+      toastActionError('No sessions generated. Check your dates and day of week.')
       setPreviewRows([])
       return
     }
@@ -226,11 +226,11 @@ export function SessionsImportForm({ spaceId, locations, courts }: SessionsImpor
     startTransition(async () => {
       const result = await importAction(JSON.stringify(validRows), false)
       if (!result.ok) {
-        toast.error(result.error)
+        toastActionError(result.error)
         return
       }
       if ('count' in result) {
-        toast.success(`Imported ${result.count} sessions`)
+        toastActionSuccess(`Imported ${result.count} sessions`)
         router.push('/dashboard/sessions')
       }
     })

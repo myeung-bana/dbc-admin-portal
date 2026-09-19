@@ -64,6 +64,8 @@ export default async function SessionDetailPage({
               courts={courts}
               session={session}
               submitLabel="Save changes"
+              successMessage="Session saved"
+              errorMessage="Could not save session"
             />
           </CardContent>
         </Card>

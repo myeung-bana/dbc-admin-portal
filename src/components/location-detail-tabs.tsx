@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { updateLocationAction } from '@/app/actions/admin'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useActionForm } from '@/hooks/use-action-form'
 import type { MasterCountry, MasterCourt, MasterLocation } from '@/lib/types'
 
 type LocationDetailTabsProps = {
@@ -36,8 +37,22 @@ export function LocationDetailTabs({
   countries,
   courts,
 }: LocationDetailTabsProps) {
-  const updateLocation = updateLocationAction.bind(null, location.id)
+  const [name, setName] = useState(location.name)
+  const [address, setAddress] = useState(location.address ?? '')
   const [countryId, setCountryId] = useState(location.country?.id ?? '')
+  const { onSubmit, pending } = useActionForm(
+    updateLocationAction.bind(null, location.id),
+    {
+      successMessage: 'Location saved',
+      errorMessage: 'Could not save location',
+    },
+  )
+
+  useEffect(() => {
+    setName(location.name)
+    setAddress(location.address ?? '')
+    setCountryId(location.country?.id ?? '')
+  }, [location.id, location.name, location.address, location.country?.id])
 
   return (
     <Tabs defaultValue="general">
@@ -52,10 +67,16 @@ export function LocationDetailTabs({
             <CardTitle>General Details</CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={updateLocation} className="space-y-4">
+            <form onSubmit={onSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" defaultValue={location.name} required />
+                <Input
+                  id="name"
+                  name="name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="countryId">Country</Label>
@@ -78,9 +99,16 @@ export function LocationDetailTabs({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
-                <Input id="address" name="address" defaultValue={location.address ?? ''} />
+                <Input
+                  id="address"
+                  name="address"
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                />
               </div>
-              <Button type="submit">Save changes</Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? 'Saving…' : 'Save changes'}
+              </Button>
             </form>
           </CardContent>
         </Card>

@@ -31,6 +31,8 @@ export default async function NewSessionPage() {
             locations={locations}
             courts={courts}
             submitLabel="Create session"
+            successMessage="Session created"
+            errorMessage="Could not create session"
           />
         </CardContent>
       </Card>

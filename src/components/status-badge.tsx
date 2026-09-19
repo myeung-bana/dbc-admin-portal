@@ -74,7 +74,9 @@ export function SpaceInviteStatusBadge({
       ? 'warning'
       : status === 'redeemed'
         ? 'success'
-        : 'neutral'
+        : status === 'exhausted'
+          ? 'neutral'
+          : 'neutral'
 
   return <StatusBadge tone={tone} label={status} className={className} />
 }

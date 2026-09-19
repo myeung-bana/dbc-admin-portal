@@ -1,16 +1,22 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { AuthBrandPanel } from '@/app/login/auth-brand-panel'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getBrowserNhost, logoutClientSession, syncSessionCookie } from '@/lib/nhost/client'
+import { ADMIN_APP_NAME } from '@/lib/brand'
 import { getPostLoginPath, getUserRolesFromSession, hasAdminPortalAccess } from '@/lib/nhost/roles'
 
+const devDefaults =
+  process.env.NODE_ENV === 'development'
+    ? { email: 'superadmin@dbc.local', password: 'Admin12345!' }
+    : { email: '', password: '' }
+
 export function LoginForm({ initialError }: { initialError?: string | null }) {
-  const [email, setEmail] = useState('superadmin@dbc.local')
-  const [password, setPassword] = useState('Admin12345!')
+  const [email, setEmail] = useState(devDefaults.email)
+  const [password, setPassword] = useState(devDefaults.password)
   const [error, setError] = useState<string | null>(initialError ?? null)
   const [loading, setLoading] = useState(false)
 
@@ -71,19 +77,29 @@ export function LoginForm({ initialError }: { initialError?: string | null }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>DBC Admin Portal</CardTitle>
-          <CardDescription>Sign in as Super Admin or Organiser.</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <div className="grid min-h-screen lg:grid-cols-2">
+      <main className="flex flex-col items-center justify-center p-6 sm:p-10">
+        <div className="mb-8 w-full max-w-md lg:hidden">
+          <p className="text-sm font-medium text-muted-foreground">Gachi</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">{ADMIN_APP_NAME}</h1>
+        </div>
+
+        <div className="w-full max-w-md">
+          <div className="mb-8 hidden lg:block">
+            <p className="text-sm font-medium text-muted-foreground">Gachi</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{ADMIN_APP_NAME}</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Sign in as Super Admin or Organiser.
+            </p>
+          </div>
+
           <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
@@ -94,18 +110,25 @@ export function LoginForm({ initialError }: { initialError?: string | null }) {
               <Input
                 id="password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
               />
             </div>
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {error ? (
+              <p className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
             <Button className="w-full" type="submit" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </main>
+
+      <AuthBrandPanel />
     </div>
   )
 }

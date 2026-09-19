@@ -36,8 +36,25 @@ export type SpaceInvite = {
   label?: string | null
   email?: string | null
   expires_at: string
-  status: 'open' | 'redeemed' | 'revoked' | 'expired'
+  status: 'open' | 'redeemed' | 'revoked' | 'expired' | 'exhausted'
+  invite_kind?: 'one_off' | 'standing'
   created_at: string
+}
+
+export type SpaceFollow = {
+  id: string
+  space_id: string
+  user_id: string
+  created_at: string
+  user?: SpaceMembershipUser | null
+}
+
+export type PassBalance = {
+  id: string
+  space_id: string
+  user_id: string
+  balance: number
+  updated_at: string
 }
 
 export type Session = {

@@ -354,6 +354,7 @@ export async function createSpaceInvite(spaceId: string, input: CreateSpaceInvit
           created_by: getActorUserId(access.auth.session),
           status: 'open',
           max_uses: 1,
+          invite_kind: 'one_off',
         },
       },
     })
@@ -500,5 +501,85 @@ export async function demoteOrganiser(spaceId: string, userId: string) {
   return callAdminFunction(auth.nhost, '/admin/memberships/demote', {
     spaceId,
     userId,
+  })
+}
+
+export async function listSpaceFollowers(spaceId: string) {
+  return adminGqlRequest<{ space_follows: import('@/lib/types').SpaceFollow[] }>(
+    `
+      query SpaceFollowers($spaceId: uuid!) {
+        space_follows(
+          where: { space_id: { _eq: $spaceId } }
+          order_by: { created_at: desc }
+        ) {
+          id
+          space_id
+          user_id
+          created_at
+          user {
+            id
+            email
+            displayName
+            avatarUrl
+          }
+        }
+      }
+    `,
+    { spaceId },
+  )
+}
+
+export async function getPassBalance(spaceId: string, userId: string) {
+  return adminGqlRequest<{ pass_balances: import('@/lib/types').PassBalance[] }>(
+    `
+      query PassBalance($spaceId: uuid!, $userId: uuid!) {
+        pass_balances(
+          where: {
+            space_id: { _eq: $spaceId }
+            user_id: { _eq: $userId }
+          }
+          limit: 1
+        ) {
+          id
+          space_id
+          user_id
+          balance
+          updated_at
+        }
+      }
+    `,
+    { spaceId, userId },
+  )
+}
+
+export async function changeMemberRole(
+  spaceId: string,
+  userId: string,
+  role: 'member' | 'casual',
+) {
+  const auth = await requireServerSession()
+  if (!auth.ok) return unauthorizedResult(auth.reason)
+
+  return callAdminFunction(auth.nhost, '/admin/memberships/change-role', {
+    spaceId,
+    userId,
+    role,
+  })
+}
+
+export async function assignPassCredits(
+  spaceId: string,
+  userId: string,
+  amount: number,
+  note?: string,
+) {
+  const auth = await requireServerSession()
+  if (!auth.ok) return unauthorizedResult(auth.reason)
+
+  return callAdminFunction(auth.nhost, '/admin/passes/assign', {
+    spaceId,
+    userId,
+    amount,
+    note,
   })
 }
